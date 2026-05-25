@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Send, Sparkle, Bot, User, Volume2 } from 'lucide-react';
 import { ChatMessage, Settings } from '../types';
 import gameAudio from '../utils/audio';
+import { generateContentWithFallback } from '../utils/geminiClient';
 
 interface AITutorPanelProps {
   settings: Settings;
@@ -59,38 +60,33 @@ export default function AITutorPanel({ settings, onAddStars }: AITutorPanelProps
           text: m.text
         }));
 
-      const response = await fetch('/api/gemini/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: textToSend,
-          history: chatHistory,
-          customApiKey: settings.customApiKey,
-          model: settings.aiModel,
-          systemInstruction: "You are Ben, a playful, warm, and extremely supportive English tutor for primary school students in Grade 3 in Vietnam. You only teach A2 vocabulary. Keep sentences short, enthusiastic, and easy to read. Translate difficult keywords to Vietnamese inside brackets e.g. 'rabbit [con thỏ]'. Use emojis to animate the explanation! Congratulate the child for asking good questions.",
-        }),
+      const systemInstruction = "You are Ben, a playful, warm, and extremely supportive English tutor for primary school students in Grade 3 in Vietnam. You only teach A2 vocabulary. Keep sentences short, enthusiastic, and easy to read. Translate difficult keywords to Vietnamese inside brackets e.g. 'rabbit [con thỏ]'. Use emojis to animate the explanation! Congratulate the child for asking good questions.";
+
+      // Call our resilient direct/retry client!
+      const result = await generateContentWithFallback({
+        prompt: textToSend,
+        history: chatHistory,
+        systemInstruction,
+        customApiKey: settings.customApiKey,
+        selectedModel: settings.aiModel
       });
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (result.success && result.text) {
         const newBotMessage: ChatMessage = {
           id: `msg-${Date.now() + 1}`,
           role: 'model',
-          text: data.text || "Thầy chưa nghĩ ra câu giải đáp, con nói lại rõ hơn được không?",
+          text: result.text || "Thầy chưa nghĩ ra câu giải đáp, con nói lại rõ hơn được không?",
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
         setMessages(prev => [...prev, newBotMessage]);
         // Reward 2 bonus stars for chatting with the AI tutor
         onAddStars(2);
       } else {
-        setErrorText(data.error || "Có lỗi bất ngờ từ máy chủ rồi bé ơi!");
+        setErrorText(result.error || "Có lỗi bất ngờ từ máy chủ rồi bé ơi!");
       }
     } catch (err: any) {
       console.error(err);
-      setErrorText("Mạng không thể truyền tin, con kiểm tra lại kết nối Wifi nhé!");
+      setErrorText(`Đã dừng do lỗi: ${err.message || 'Mạng không thể truyền tin, con kiểm tra lại kết nối Wifi nhé!'}`);
     } finally {
       setIsLoading(false);
     }

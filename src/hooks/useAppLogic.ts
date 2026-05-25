@@ -20,10 +20,13 @@ export function useAppLogic() {
       theme: 'light',
       soundEnabled: true,
       autoSave: true,
-      aiModel: 'gemini-3.5-flash',
+      aiModel: 'gemini-3-flash-preview',
       customApiKey: ''
     }
   });
+
+  // API Key Modal State
+  const [isApiModalOpen, setIsApiModalOpen] = useState<boolean>(false);
 
   // UI Active Navigation Tabs: 'games' | 'tutor' | 'dashboard'
   const [activeTab, setActiveTab] = useState<'games' | 'tutor' | 'dashboard'>('games');
@@ -50,14 +53,19 @@ export function useAppLogic() {
       try {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
-          setAppState(prev => ({
-            ...parsed,
-            settings: { ...prev.settings, ...(parsed.settings || {}) },
-            progress: { ...prev.progress, ...(parsed.progress || {}) },
-            questions: parsed.questions?.length ? parsed.questions : prev.questions,
-            subjects: parsed.subjects?.length ? parsed.subjects : prev.subjects,
-            sessions: parsed.sessions || []
-          }));
+          setAppState(prev => {
+            const updatedSettings = { ...prev.settings, ...(parsed.settings || {}) };
+            // Ensure the direct helper has access to the customized API key
+            localStorage.setItem('gemini_api_key_custom', updatedSettings.customApiKey || '');
+            return {
+              ...parsed,
+              settings: updatedSettings,
+              progress: { ...prev.progress, ...(parsed.progress || {}) },
+              questions: parsed.questions?.length ? parsed.questions : prev.questions,
+              subjects: parsed.subjects?.length ? parsed.subjects : prev.subjects,
+              sessions: parsed.sessions || []
+            };
+          });
           gameAudio.setSoundEnabled(parsed.settings?.soundEnabled ?? true);
         }
       } catch (err) {
@@ -118,6 +126,8 @@ export function useAppLogic() {
 
   // Update AI options from settings dashboard
   const handleUpdateSettings = (newSettings: Settings) => {
+    // Sync with REST helper
+    localStorage.setItem('gemini_api_key_custom', newSettings.customApiKey || '');
     const updated = {
       ...appState,
       settings: newSettings
@@ -151,10 +161,11 @@ export function useAppLogic() {
         theme: 'light',
         soundEnabled: true,
         autoSave: true,
-        aiModel: 'gemini-3.5-flash',
+        aiModel: 'gemini-3-flash-preview',
         customApiKey: ''
       }
     };
+    localStorage.setItem('gemini_api_key_custom', '');
     setAppState(updated);
     saveStateToStorage(updated);
   };
@@ -340,6 +351,8 @@ export function useAppLogic() {
     quitSessionEarly,
     handleAnswerSubmit,
     goNextQuestion,
-    setIsSessionFinished
+    setIsSessionFinished,
+    isApiModalOpen,
+    setIsApiModalOpen
   };
 }

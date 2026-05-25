@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Sparkles, Check, Flame, Star, BookOpen, Settings } from 'lucide-react';
 import { Question, Settings as AppSettings } from '../types';
 import gameAudio from '../utils/audio';
+import { generateContentWithFallback } from '../utils/geminiClient';
 
 interface AIQuizGeneratorProps {
   settings: AppSettings;
@@ -33,63 +34,98 @@ export default function AIQuizGenerator({ settings, onQuestionsGenerated }: AIQu
     setSuccessCount(null);
 
     try {
-      const response = await fetch('/api/gemini/generate-quiz', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          topic: finalTopic,
-          difficulty: difficulty,
-          count: questionCount,
-          customApiKey: settings.customApiKey,
-          model: settings.aiModel
-        })
+      const systemInstruction = `You are a teacher specialized in Grade 3 English (A2 Level) for primary school students in Vietnam. 
+Generate fun, engaging and child-appropriate vocabulary questions about the requested topic: ${finalTopic}.
+The generated questions MUST match the specified difficulty (${difficulty}).
+Provide matching pairs, word puzzles, gap-filling exercises, or trivia clues.
+Keep the language extremely encouraging, friendly, and correct. Use Vietnamese for explanations/translations.`;
+
+      const prompt = `Generate exactly ${questionCount} English vocabulary questions for Grade 3 (A2 level) on the topic: "${finalTopic}".
+Difficulty level: "${difficulty}".
+You must return a raw JSON array of objects fitting this structure:
+[
+  {
+    "content": "A direct question, a sentence with a missing word shown as ___ or a descriptive clue to guess.",
+    "type": "matching" or "gap-filling" or "guess-word",
+    "correctAnswer": "The correct option or target word. Examples: For guess-word: 'dog'. For gap-filling: 'is' or the missing letter. For matching: comma-separated pairs or single answer.",
+    "options": ["Option A", "Option B", "Option C", "Option D"], // Provide 4 logical options for children (compulsory for gap-filling and matching types). Keep it simple and clear.
+    "explanation": "Simple Vietnamese explanation telling why it is correct and translating the sentence/word so a 8-year-old can understand directly.",
+    "difficulty": "${difficulty}",
+    "clue": "An emoji or supportive hint in Vietnamese."
+  }
+]
+Important guidelines:
+- For 'gap-filling': The 'content' should contain a blank like '___'. The options should contain the correct word as one of the choices.
+- For 'matching': The user matches a English word, e.g. "father", with its translation. E.g. content: "Hãy nối các từ sau với nghĩa đúng của chúng.", correctAnswer: "father: bố, mother: mẹ, brother: anh trai, sister: chị gái", options: ["bố (father)", "mẹ (mother)", "anh trai (brother)", "chị gái (sister)"]. Keep options clear and simple.
+- For 'guess-word': Provide a nice clue about an animal, household item, family member etc. E.g., Content: "I have four legs and bark 'Woof!'. What am I?", correctAnswer: "dog", clue: "🐶 Thú cưng trung thành trong nhà"
+Ensure all text except English vocabulary words is written in warm, pedagogical Vietnamese suitable for a 3rd grader.`;
+
+      // Call our resilient direct/retry client!
+      const result = await generateContentWithFallback({
+        prompt,
+        systemInstruction,
+        responseMimeType: 'application/json',
+        customApiKey: settings.customApiKey,
+        selectedModel: settings.aiModel
       });
 
-      const data = await response.json();
+      if (result.success && result.text) {
+        // Clean JSON text (sometimes models wrap in ```json ... ``` despite config)
+        let cleanedJson = result.text.trim();
+        if (cleanedJson.startsWith('```json')) {
+          cleanedJson = cleanedJson.substring(7);
+        }
+        if (cleanedJson.endsWith('```')) {
+          cleanedJson = cleanedJson.substring(0, cleanedJson.length - 3);
+        }
+        cleanedJson = cleanedJson.trim();
 
-      if (data.success && Array.isArray(data.questions)) {
-        // Map the generated simple questions to Question format
-        const generated: Question[] = data.questions.map((q: any, index: number) => {
-          let type = q.type || 'guess-word';
-          // Check for fallback types
-          if (type !== 'matching' && type !== 'gap-filling' && type !== 'guess-word') {
-            type = 'guess-word';
-          }
+        const parsedQuestions = JSON.parse(cleanedJson);
 
-          // Build a matching structure or direct clean answers
-          const matchedPairs = type === 'matching' ? [
-            { left: q.options?.[0] || 'apple', right: 'quả táo' },
-            { left: q.options?.[1] || 'banana', right: 'quả chuối' },
-            { left: q.options?.[2] || 'orange', right: 'quả cam' },
-            { left: q.options?.[3] || 'grape', right: 'quả nho' }
-          ] : undefined;
+        if (Array.isArray(parsedQuestions)) {
+          // Map the generated simple questions to Question format
+          const generated: Question[] = parsedQuestions.map((q: any, index: number) => {
+            let type = q.type || 'guess-word';
+            // Check for fallback types
+            if (type !== 'matching' && type !== 'gap-filling' && type !== 'guess-word') {
+              type = 'guess-word';
+            }
 
-          return {
-            id: `ai_${Date.now()}_${index}`,
-            subjectId: 'ai_tutor_topic', // Store under a special virtual AI Topic
-            content: q.content || "Question generated",
-            type: type,
-            options: q.options || ['A', 'B', 'C', 'D'],
-            correctAnswer: q.correctAnswer || 'answer',
-            explanation: q.explanation || 'Giải thích chuẩn mực từ giáo viên AI.',
-            difficulty: q.difficulty || difficulty,
-            clue: q.clue || '✨ Khám phá câu hỏi thú vị',
-            matchedPairs
-          };
-        });
+            // Build a matching structure or direct clean answers
+            const matchedPairs = type === 'matching' ? [
+              { left: q.options?.[0] || 'apple', right: 'quả táo' },
+              { left: q.options?.[1] || 'banana', right: 'quả chuối' },
+              { left: q.options?.[2] || 'orange', right: 'quả cam' },
+              { left: q.options?.[3] || 'grape', right: 'quả nho' }
+            ] : undefined;
 
-        onQuestionsGenerated(generated);
-        setSuccessCount(generated.length);
-        setTopicInput('');
-        gameAudio.playVictory();
+            return {
+              id: `ai_${Date.now()}_${index}`,
+              subjectId: 'ai_tutor_topic', // Store under a special virtual AI Topic
+              content: q.content || "Question generated",
+              type: type,
+              options: q.options || ['A', 'B', 'C', 'D'],
+              correctAnswer: q.correctAnswer || 'answer',
+              explanation: q.explanation || 'Giải thích chuẩn mực từ giáo viên AI.',
+              difficulty: q.difficulty || difficulty,
+              clue: q.clue || '✨ Khám phá câu hỏi thú vị',
+              matchedPairs
+            };
+          });
+
+          onQuestionsGenerated(generated);
+          setSuccessCount(generated.length);
+          setTopicInput('');
+          gameAudio.playVictory();
+        } else {
+          setErrorText("Đã dừng do lỗi: Phản hồi từ AI không đúng cấu trúc danh sách đề.");
+        }
       } else {
-        setErrorText(data.error || "Máy chủ phản hồi sai định dạng, bé hãy thử lại nhé!");
+        setErrorText(result.error || "Đã dừng do lỗi: Máy chủ phản hồi sai định dạng, bé hãy thử lại nhé!");
       }
     } catch (err: any) {
       console.error(err);
-      setErrorText("Mạng không ổn định hoặc chưa cấu hình API Key chính xác bé ơi!");
+      setErrorText(`Đã dừng do lỗi: ${err.message || 'Mạng không ổn định hoặc lỗi xử lý dữ liệu AI.'}`);
     } finally {
       setIsLoading(false);
     }

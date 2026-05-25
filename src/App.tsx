@@ -15,6 +15,7 @@ import GapFillingGame from './components/GapFillingGame';
 import GuessWordGame from './components/GuessWordGame';
 import DragDropGame from './components/DragDropGame';
 import Dashboard from './components/Dashboard';
+import ApiKeyModal from './components/ApiKeyModal';
 import { useAppLogic } from './hooks/useAppLogic';
 export default function App() {
   const {
@@ -43,8 +44,21 @@ export default function App() {
     quitSessionEarly,
     handleAnswerSubmit,
     goNextQuestion,
-    setIsSessionFinished
+    setIsSessionFinished,
+    isApiModalOpen,
+    setIsApiModalOpen
   } = useAppLogic();
+
+  // Check if API Key is missing and open the modal as compulsory
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const savedKey = appState.settings.customApiKey || localStorage.getItem('gemini_api_key_custom') || '';
+      if (!savedKey) {
+        setIsApiModalOpen(true);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [appState.settings.customApiKey, setIsApiModalOpen]);
 
   // Helper mapping string icon descriptions to React elements
   const renderSubjectIcon = (iconName: string) => {
@@ -199,6 +213,24 @@ export default function App() {
             
             <div className="w-10 h-10 select-none rounded-full bg-blue-100 border-2 border-white dark:border-slate-850 shadow-sm flex items-center justify-center text-xl">
               👦
+            </div>
+
+            {/* Settings (API Key) & Warning label */}
+            <div className="flex items-center gap-2 border-l border-slate-200 dark:border-slate-800 pl-3 shrink-0">
+              <span className="text-[10px] text-red-500 font-extrabold hidden lg:inline animate-pulse select-none">
+                🔴 Lấy API key để sử dụng app
+              </span>
+              <button
+                onClick={() => {
+                  gameAudio.playClick();
+                  setIsApiModalOpen(true);
+                }}
+                className="bg-red-500 hover:bg-red-600 active:scale-95 text-white font-black px-3 py-2 rounded-xl text-[10px] flex items-center gap-1 cursor-pointer transition shadow-md hover:shadow-red-500/20 uppercase tracking-wide"
+                title="Cấu hình Trí tuệ & API Key"
+              >
+                <SettingsIcon className="w-3.5 h-3.5" />
+                <span>Settings (API Key)</span>
+              </button>
             </div>
 
             {/* Utilities Toolbar inside header */}
@@ -602,6 +634,20 @@ export default function App() {
           </div>
         </footer>
 
+        <ApiKeyModal
+          isOpen={isApiModalOpen}
+          onClose={() => setIsApiModalOpen(false)}
+          apiKey={appState.settings.customApiKey || localStorage.getItem('gemini_api_key_custom') || ''}
+          selectedModel={appState.settings.aiModel}
+          onSave={(key, model) => {
+            handleUpdateSettings({
+              ...appState.settings,
+              customApiKey: key,
+              aiModel: model
+            });
+          }}
+          isCompulsory={!(appState.settings.customApiKey || localStorage.getItem('gemini_api_key_custom') || '')}
+        />
       </div>
     </div>
   );
