@@ -1,0 +1,6 @@
+{
+  "name": "A2 English Vocabulary Games",
+  "description": "Ứng dụng học từ vựng tiếng Anh trình độ A2 cho học sinh lớp 3 thông qua các trò chơi tương tác thú vị và AI Tutor.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
