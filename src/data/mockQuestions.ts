@@ -83,6 +83,17 @@ export const mockQuestions: Question[] = [
     difficulty: 'medium',
     clue: '👦 Em trai tinh nghịch'
   },
+  {
+    id: 'fam_5',
+    subjectId: 'family',
+    content: "My mother is cooking in the kitchen, and my ___ is reading a newspaper.",
+    type: 'drag-drop',
+    options: ['father', 'sister', 'baby', 'dog'],
+    correctAnswer: 'father',
+    explanation: "'father' là 'bố'. Trong câu này, mẹ đang nấu ăn thì bố đọc báo.",
+    difficulty: 'medium',
+    clue: '👨 Người bố thân yêu'
+  },
 
   // --- School Subject ---
   {
@@ -134,6 +145,17 @@ export const mockQuestions: Question[] = [
     difficulty: 'easy',
     clue: '👩‍🏫 Người lái đò tri thức',
     options: ['teacher', 'doctor', 'pilot', 'singer']
+  },
+  {
+    id: 'sch_5',
+    subjectId: 'school',
+    content: "I use my ___ to write letters and draw pictures.",
+    type: 'drag-drop',
+    options: ['pencil', 'eraser', 'ruler', 'book'],
+    correctAnswer: 'pencil',
+    explanation: "'pencil' là 'bút chì'. Chúng ta dùng bút chì để viết chữ và vẽ tranh.",
+    difficulty: 'easy',
+    clue: '✏️ Cây bút nhỏ xinh'
   },
 
   // --- Hobbies Subject ---

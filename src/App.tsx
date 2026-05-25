@@ -13,6 +13,7 @@ import AIQuizGenerator from './components/AIQuizGenerator';
 import MatchingGame from './components/MatchingGame';
 import GapFillingGame from './components/GapFillingGame';
 import GuessWordGame from './components/GuessWordGame';
+import DragDropGame from './components/DragDropGame';
 import Dashboard from './components/Dashboard';
 import { useAppLogic } from './hooks/useAppLogic';
 export default function App() {
@@ -486,6 +487,14 @@ export default function App() {
                         onAnswer={(isCorrect) => handleAnswerSubmit(isCorrect, isAnswered ? undefined : 'word')}
                         isAnswered={isAnswered}
                         selectedAnswer={selectedAnswer}
+                      />
+                    )}
+
+                    {sessionQuestions[currentQuestionIndex].type === 'drag-drop' && (
+                      <DragDropGame 
+                        question={sessionQuestions[currentQuestionIndex]}
+                        onAnswer={(isCorrect) => handleAnswerSubmit(isCorrect)}
+                        isAnswered={isAnswered}
                       />
                     )}
                   </motion.div>
